@@ -378,7 +378,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/@rive-app/canvas@2.37.8/rive.js"></script>
+<script src="https://unpkg.com/@rive-app/webgl2@2.38.0/rive.js"></script>
 <script>
 const RIVE_DIR = 'rive_files/';
 let allFiles = [];
@@ -500,7 +500,8 @@ function loadPlayer(src, artboard, preferredSM) {
         onLoad: () => {
           document.getElementById('player-loading').style.display = 'none';
           const r = playerRive;
-          r.resizeDrawingSurfaceToCanvas();
+          // Only resize if layout is ready; otherwise keep the 800x800 set at creation
+          if (canvas.offsetWidth > 0) r.resizeDrawingSurfaceToCanvas();
           buildControls(r, preferredSM || sms[0]);
         },
         onLoadError: () => {
