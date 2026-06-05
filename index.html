@@ -454,27 +454,22 @@ function loadThumb(filename) {
 
 // Modal
 function openModal(filename) {
-  if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
-
   document.getElementById('modal-title').textContent = filename.replace(/\.riv$/, '');
   document.getElementById('controls').innerHTML = '';
-  document.getElementById('player-loading').style.display = 'flex';
-
-  const wrap = document.getElementById('player-wrap');
-  // Always create a fresh canvas so prior context teardown doesn't corrupt it
-  wrap.querySelectorAll('canvas').forEach(c => c.remove());
-  const canvas = document.createElement('canvas');
-  canvas.width = 800;
-  canvas.height = 800;
-  wrap.appendChild(canvas);
-
   document.getElementById('modal-backdrop').classList.add('open');
-
-  loadPlayer(RIVE_DIR + filename, canvas);
+  loadPlayer(RIVE_DIR + filename);
 }
 
-function loadPlayer(src, canvas, artboard, preferredSM) {
+function loadPlayer(src, artboard, preferredSM) {
+  // Cleanup first while canvas is still in DOM, then swap canvas
   if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
+
+  const wrap = document.getElementById('player-wrap');
+  wrap.querySelectorAll('canvas').forEach(c => c.remove());
+  const canvas = document.createElement('canvas');
+  canvas.width = 800; canvas.height = 800;
+  wrap.appendChild(canvas);
+  document.getElementById('player-loading').style.display = 'flex';
 
   // Probe on a hidden canvas to discover SM names, then load for real with them declared
   const probeCanvas = document.createElement('canvas');
@@ -504,11 +499,9 @@ function loadPlayer(src, canvas, artboard, preferredSM) {
         autoplay: true,
         onLoad: () => {
           document.getElementById('player-loading').style.display = 'none';
-          // Wait for layout so canvas.offsetWidth is valid before resizing
-          requestAnimationFrame(() => {
-            playerRive.resizeDrawingSurfaceToCanvas();
-            buildControls(playerRive, preferredSM || sms[0]);
-          });
+          const r = playerRive;
+          r.resizeDrawingSurfaceToCanvas();
+          buildControls(r, preferredSM || sms[0]);
         },
         onLoadError: () => {
           document.getElementById('player-loading').textContent = 'Failed to load file.';
@@ -540,13 +533,7 @@ function buildControls(r, preferredSM) {
     sel.value = r.activeArtboard || artboards[0];
     sel.addEventListener('change', () => {
       const file = document.getElementById('modal-title').textContent + '.riv';
-      const wrap = document.getElementById('player-wrap');
-      wrap.querySelectorAll('canvas').forEach(c => c.remove());
-      const canvas = document.createElement('canvas');
-      canvas.width = 800; canvas.height = 800;
-      wrap.appendChild(canvas);
-      document.getElementById('player-loading').style.display = 'flex';
-      loadPlayer(RIVE_DIR + file, canvas, sel.value);
+      loadPlayer(RIVE_DIR + file, sel.value);
     });
     sec.appendChild(sel);
     container.appendChild(sec);
@@ -568,9 +555,11 @@ function buildControls(r, preferredSM) {
       opt.textContent = name;
       smSel.appendChild(opt);
     });
+    smSel.value = activeSM;
     smSel.addEventListener('change', () => {
       activeSM = smSel.value;
-      renderInputs(r, activeSM, inputsSec);
+      const file = document.getElementById('modal-title').textContent + '.riv';
+      loadPlayer(RIVE_DIR + file, undefined, activeSM);
     });
     smSec.appendChild(smSel);
   } else {
