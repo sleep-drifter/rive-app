@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rive Gallery</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f2f2f7;
+      --surface: #ffffff;
+      --surface2: #e5e5ea;
+      --text: #1c1c1e;
+      --text2: #6c6c70;
+      --border: rgba(0,0,0,0.08);
+      --accent: #007aff;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+      --radius: 14px;
+      --overlay-bg: rgba(0,0,0,0.45);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --surface: #1c1c1e;
+        --surface2: #2c2c2e;
+        --text: #ffffff;
+        --text2: #8e8e93;
+        --border: rgba(255,255,255,0.08);
+        --accent: #0a84ff;
+        --shadow: 0 2px 12px rgba(0,0,0,0.4);
+        --overlay-bg: rgba(0,0,0,0.7);
+      }
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 28px 28px 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header span {
+      font-size: 14px;
+      color: var(--text2);
+    }
+
+    .search-bar {
+      padding: 0 28px 20px;
+    }
+
+    .search-bar input {
+      width: 100%;
+      max-width: 400px;
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .search-bar input:focus {
+      border-color: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      padding: 0 28px 40px;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+    }
+
+    .card-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-thumb canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .thumb-placeholder {
+      font-size: 36px;
+      opacity: 0.3;
+    }
+
+    .thumb-error {
+      font-size: 11px;
+      color: var(--text2);
+      text-align: center;
+      padding: 8px;
+    }
+
+    .card-label {
+      padding: 10px 12px 12px;
+    }
+
+    .card-label p {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--overlay-bg);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 760px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      padding: 18px 20px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .modal-header h2 {
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 40px);
+    }
+
+    .close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .player-wrap {
+      width: 100%;
+      aspect-ratio: 1;
+      background: var(--surface2);
+      position: relative;
+    }
+
+    .player-wrap canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .controls {
+      padding: 16px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .controls-section h3 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    .artboard-select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .sm-select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .inputs-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .input-row label {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .input-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .input-row input[type="number"],
+    .input-row input[type="range"] {
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    .input-row input[type="number"] {
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      width: 80px;
+    }
+
+    .input-row input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    .trigger-btn {
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .trigger-btn:active {
+      opacity: 0.8;
+    }
+
+    .no-inputs {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .loading-spinner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--text2);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Rive Gallery</h1>
+  <span id="file-count"></span>
+</header>
+
+<div class="search-bar">
+  <input type="text" id="search" placeholder="Search files…" />
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modal-title"></h2>
+      <button class="close-btn" id="close-btn">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="player-wrap" id="player-wrap">
+        <div class="loading-spinner" id="player-loading">Loading…</div>
+      </div>
+      <div class="controls" id="controls"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/@rive-app/canvas@2.37.8/rive.js"></script>
+<script>
+const RIVE_DIR = 'rive_files/';
+let allFiles = [];
+let thumbRives = {};
+let playerRive = null;
+
+async function init() {
+  const res = await fetch('files.json');
+  allFiles = await res.json();
+  document.getElementById('file-count').textContent = `${allFiles.length} files`;
+  renderGrid(allFiles);
+  setupSearch();
+}
+
+function setupSearch() {
+  document.getElementById('search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderGrid(allFiles.filter(f => f.toLowerCase().includes(q)));
+  });
+}
+
+function renderGrid(files) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  files.forEach(filename => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-thumb" id="thumb-${CSS.escape(filename)}">
+        <span class="thumb-placeholder">◆</span>
+      </div>
+      <div class="card-label"><p title="${filename}">${filename.replace(/\.riv$/, '')}</p></div>
+    `;
+    card.addEventListener('click', () => openModal(filename));
+    grid.appendChild(card);
+
+    // Render thumbnail after inserting into DOM
+    requestAnimationFrame(() => loadThumb(filename));
+  });
+}
+
+function loadThumb(filename) {
+  const container = document.getElementById(`thumb-${CSS.escape(filename)}`);
+  if (!container) return;
+
+  const size = container.offsetWidth || 220;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  try {
+    const r = new rive.Rive({
+      src: RIVE_DIR + filename,
+      canvas,
+      layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+      autoplay: false,
+      onLoad: () => {
+        r.drawFrame();
+        // Keep a single frame rendered; advance slightly if blank
+        setTimeout(() => r.drawFrame(), 100);
+      },
+      onLoadError: () => {
+        container.innerHTML = `<span class="thumb-error">Failed to load</span>`;
+      },
+    });
+    thumbRives[filename] = r;
+  } catch {
+    container.innerHTML = `<span class="thumb-error">Error</span>`;
+  }
+}
+
+// Modal
+function openModal(filename) {
+  if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
+
+  document.getElementById('modal-title').textContent = filename.replace(/\.riv$/, '');
+  document.getElementById('controls').innerHTML = '';
+  document.getElementById('player-loading').style.display = 'flex';
+
+  const wrap = document.getElementById('player-wrap');
+  let canvas = wrap.querySelector('canvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 800;
+    wrap.appendChild(canvas);
+  }
+
+  document.getElementById('modal-backdrop').classList.add('open');
+
+  playerRive = new rive.Rive({
+    src: RIVE_DIR + filename,
+    canvas,
+    layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+    autoplay: true,
+    onLoad: () => {
+      document.getElementById('player-loading').style.display = 'none';
+      playerRive.resizeDrawingSurfaceToCanvas();
+      buildControls(playerRive);
+    },
+    onLoadError: () => {
+      document.getElementById('player-loading').textContent = 'Failed to load file.';
+    },
+  });
+}
+
+function buildControls(r) {
+  const container = document.getElementById('controls');
+  container.innerHTML = '';
+
+  // Artboards
+  const artboards = r.artboardNames;
+  if (artboards && artboards.length > 1) {
+    const sec = makeSection('Artboard');
+    const sel = document.createElement('select');
+    sel.className = 'artboard-select';
+    artboards.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.value = r.activeArtboard || artboards[0];
+    sel.addEventListener('change', () => {
+      // Reload with new artboard
+      const file = document.getElementById('modal-title').textContent + '.riv';
+      if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
+      const wrap = document.getElementById('player-wrap');
+      const canvas = wrap.querySelector('canvas');
+      document.getElementById('player-loading').style.display = 'flex';
+      playerRive = new rive.Rive({
+        src: RIVE_DIR + file,
+        canvas,
+        artboard: sel.value,
+        layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+        autoplay: true,
+        onLoad: () => {
+          document.getElementById('player-loading').style.display = 'none';
+          playerRive.resizeDrawingSurfaceToCanvas();
+          buildControls(playerRive);
+        },
+      });
+    });
+    sec.appendChild(sel);
+    container.appendChild(sec);
+  }
+
+  // State machines
+  const sms = r.stateMachineNames;
+  if (!sms || sms.length === 0) return;
+
+  let activeSM = sms[0];
+
+  const smSec = makeSection('State Machine');
+  if (sms.length > 1) {
+    const smSel = document.createElement('select');
+    smSel.className = 'sm-select';
+    sms.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      smSel.appendChild(opt);
+    });
+    smSel.addEventListener('change', () => {
+      activeSM = smSel.value;
+      renderInputs(r, activeSM, inputsSec);
+    });
+    smSec.appendChild(smSel);
+  } else {
+    const label = document.createElement('p');
+    label.style.cssText = 'font-size:13px;color:var(--text)';
+    label.textContent = sms[0];
+    smSec.appendChild(label);
+  }
+  container.appendChild(smSec);
+
+  const inputsSec = document.createElement('div');
+  container.appendChild(inputsSec);
+  renderInputs(r, activeSM, inputsSec);
+}
+
+function renderInputs(r, smName, container) {
+  container.innerHTML = '';
+  let inputs;
+  try { inputs = r.stateMachineInputs(smName); } catch { return; }
+
+  if (!inputs || inputs.length === 0) {
+    const sec = makeSection('Inputs');
+    const p = document.createElement('p');
+    p.className = 'no-inputs';
+    p.textContent = 'No inputs on this state machine.';
+    sec.appendChild(p);
+    container.appendChild(sec);
+    return;
+  }
+
+  const sec = makeSection('Inputs');
+  const grid = document.createElement('div');
+  grid.className = 'inputs-grid';
+
+  inputs.forEach(input => {
+    const row = document.createElement('div');
+    row.className = 'input-row';
+    const label = document.createElement('label');
+    label.textContent = input.name;
+    row.appendChild(label);
+
+    if (input.type === rive.StateMachineInputType.Trigger) {
+      const btn = document.createElement('button');
+      btn.className = 'trigger-btn';
+      btn.textContent = 'Fire';
+      btn.addEventListener('click', () => input.fire());
+      row.appendChild(btn);
+    } else if (input.type === rive.StateMachineInputType.Boolean) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = input.value;
+      cb.addEventListener('change', () => { input.value = cb.checked; });
+      row.appendChild(cb);
+    } else if (input.type === rive.StateMachineInputType.Number) {
+      const range = document.createElement('input');
+      range.type = 'range';
+      range.min = 0;
+      range.max = 100;
+      range.step = 0.1;
+      range.value = input.value;
+
+      const num = document.createElement('input');
+      num.type = 'number';
+      num.value = input.value;
+
+      range.addEventListener('input', () => {
+        input.value = parseFloat(range.value);
+        num.value = range.value;
+      });
+      num.addEventListener('change', () => {
+        input.value = parseFloat(num.value);
+        range.value = num.value;
+      });
+
+      row.appendChild(range);
+      row.appendChild(num);
+    }
+
+    grid.appendChild(row);
+  });
+
+  sec.appendChild(grid);
+  container.appendChild(sec);
+}
+
+function makeSection(title) {
+  const sec = document.createElement('div');
+  sec.className = 'controls-section';
+  const h = document.createElement('h3');
+  h.textContent = title;
+  sec.appendChild(h);
+  return sec;
+}
+
+// Close modal
+document.getElementById('close-btn').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('open');
+  if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
+}
+
+init();
+</script>
+</body>
+</html>
