@@ -456,25 +456,59 @@ function openModal(filename) {
   document.getElementById('player-loading').style.display = 'flex';
 
   const wrap = document.getElementById('player-wrap');
-  let canvas = wrap.querySelector('canvas');
-  if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 800;
-    wrap.appendChild(canvas);
-  }
+  // Always create a fresh canvas so prior context teardown doesn't corrupt it
+  wrap.querySelectorAll('canvas').forEach(c => c.remove());
+  const canvas = document.createElement('canvas');
+  canvas.width = 800;
+  canvas.height = 800;
+  wrap.appendChild(canvas);
 
   document.getElementById('modal-backdrop').classList.add('open');
 
-  playerRive = new rive.Rive({
-    src: RIVE_DIR + filename,
-    canvas,
-    layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
-    autoplay: true,
+  loadPlayer(RIVE_DIR + filename, canvas);
+}
+
+function loadPlayer(src, canvas, artboard, preferredSM) {
+  if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
+
+  // Probe on a hidden canvas to discover SM names, then load for real with them declared
+  const probeCanvas = document.createElement('canvas');
+  probeCanvas.width = 4; probeCanvas.height = 4;
+  const probe = new rive.Rive({
+    src,
+    canvas: probeCanvas,
+    artboard,
+    autoplay: false,
     onLoad: () => {
-      document.getElementById('player-loading').style.display = 'none';
-      playerRive.resizeDrawingSurfaceToCanvas();
-      buildControls(playerRive);
+      const sms = probe.stateMachineNames || [];
+      // Don't cleanup probe — shared WASM resources may be needed by the player instance
+
+      // Ensure canvas has valid pixel dimensions before Rive initializes
+      if (!canvas.width || !canvas.height) {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = (canvas.offsetWidth || 800) * dpr;
+        canvas.height = (canvas.offsetHeight || 800) * dpr;
+      }
+
+      playerRive = new rive.Rive({
+        src,
+        canvas,
+        artboard,
+        stateMachines: sms,
+        layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
+        autoplay: true,
+        onLoad: () => {
+          document.getElementById('player-loading').style.display = 'none';
+          // Wait for layout so canvas.offsetWidth is valid before resizing
+          requestAnimationFrame(() => {
+            playerRive.resizeDrawingSurfaceToCanvas();
+            buildControls(playerRive, preferredSM || sms[0]);
+          });
+        },
+        onLoadError: () => {
+          document.getElementById('player-loading').textContent = 'Failed to load file.';
+        },
+      });
     },
     onLoadError: () => {
       document.getElementById('player-loading').textContent = 'Failed to load file.';
@@ -482,7 +516,7 @@ function openModal(filename) {
   });
 }
 
-function buildControls(r) {
+function buildControls(r, preferredSM) {
   const container = document.getElementById('controls');
   container.innerHTML = '';
 
@@ -500,24 +534,14 @@ function buildControls(r) {
     });
     sel.value = r.activeArtboard || artboards[0];
     sel.addEventListener('change', () => {
-      // Reload with new artboard
       const file = document.getElementById('modal-title').textContent + '.riv';
-      if (playerRive) { try { playerRive.cleanup(); } catch {} playerRive = null; }
       const wrap = document.getElementById('player-wrap');
-      const canvas = wrap.querySelector('canvas');
+      wrap.querySelectorAll('canvas').forEach(c => c.remove());
+      const canvas = document.createElement('canvas');
+      canvas.width = 800; canvas.height = 800;
+      wrap.appendChild(canvas);
       document.getElementById('player-loading').style.display = 'flex';
-      playerRive = new rive.Rive({
-        src: RIVE_DIR + file,
-        canvas,
-        artboard: sel.value,
-        layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.Center }),
-        autoplay: true,
-        onLoad: () => {
-          document.getElementById('player-loading').style.display = 'none';
-          playerRive.resizeDrawingSurfaceToCanvas();
-          buildControls(playerRive);
-        },
-      });
+      loadPlayer(RIVE_DIR + file, canvas, sel.value);
     });
     sec.appendChild(sel);
     container.appendChild(sec);
@@ -527,7 +551,7 @@ function buildControls(r) {
   const sms = r.stateMachineNames;
   if (!sms || sms.length === 0) return;
 
-  let activeSM = sms[0];
+  let activeSM = preferredSM || sms[0];
 
   const smSec = makeSection('State Machine');
   if (sms.length > 1) {
