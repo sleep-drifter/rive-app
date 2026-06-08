@@ -400,28 +400,44 @@ function setupSearch() {
   });
 }
 
+const thumbObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const filename = entry.target.dataset.filename;
+      if (filename && !thumbRives[filename]) {
+        thumbObserver.unobserve(entry.target);
+        loadThumb(filename, entry.target.querySelector('.card-thumb'));
+      }
+    }
+  });
+}, { rootMargin: '200px' });
+
 function renderGrid(files) {
   const grid = document.getElementById('grid');
+  // Cleanup observers on old cards
+  grid.querySelectorAll('.card').forEach(c => thumbObserver.unobserve(c));
+  // Cleanup old thumb instances
+  Object.values(thumbRives).forEach(r => { try { r.cleanup(); } catch {} });
+  thumbRives = {};
+
   grid.innerHTML = '';
   files.forEach(filename => {
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.filename = filename;
     card.innerHTML = `
-      <div class="card-thumb" id="thumb-${CSS.escape(filename)}">
+      <div class="card-thumb">
         <span class="thumb-placeholder">◆</span>
       </div>
       <div class="card-label"><p title="${filename}">${filename.replace(/\.riv$/, '')}</p></div>
     `;
     card.addEventListener('click', () => openModal(filename));
     grid.appendChild(card);
-
-    // Render thumbnail after inserting into DOM
-    requestAnimationFrame(() => loadThumb(filename));
+    thumbObserver.observe(card);
   });
 }
 
-function loadThumb(filename) {
-  const container = document.getElementById(`thumb-${CSS.escape(filename)}`);
+function loadThumb(filename, container) {
   if (!container) return;
 
   const size = container.offsetWidth || 220;
